@@ -1,0 +1,205 @@
+#include <iostream>
+#include <vector>
+#include <memory>
+#include <cstdlib>
+#include <ctime>
+#include <limits>
+using namespace std;
+void printBoxTop()    { cout << "+=======================================+\n"; }
+void printBoxBottom() { cout << "+=======================================+\n"; }
+void printSeparator() { cout << "|---------------------------------------|\n"; }
+void printHeading(const string& title) {
+    printBoxTop();
+    cout << "|";
+    int padding = (39 - title.length()) / 2;
+    for(int i=0; i<padding; i++) cout << " ";
+    cout << title;
+    for(int i=0; i < 39-padding-title.length(); i++) cout << " ";
+    cout << "|\n";
+    printBoxTop();
+}
+class Player {
+    string name;
+    int balance;
+public:
+    Player(string n, int b) : name(n), balance(b) {}
+    string getName() { return name; }
+    int getBalance() { return balance; }
+    void addAmount(int amt) { balance += amt; }
+    void deductAmount(int amt) { balance -= amt; }
+};
+class NumberGame {
+public:
+    virtual ~NumberGame() {}
+    virtual bool play(int round) = 0;
+    virtual string getName() = 0;
+};
+class OddEvenGame : public NumberGame {
+public:
+    string getName() override { return "Guess Odd or Even"; }
+    bool play(int round) override {
+        int guess;
+        cout << "Guess (1 for Odd / 2 for Even): ";
+        cin >> guess;
+        int number = (round == 1) ? 3 : (round == 2) ? 4 : (rand() % 10) + 1;
+        cout << "Coin lands on: " << number << endl;
+        bool isEven = (number % 2 == 0);
+        return (guess == 2 && isEven) || (guess == 1 && !isEven);
+    }
+};
+class HigherLowerGame : public NumberGame {
+public:
+    string getName() override { return "Guess Higher or Lower than 10"; }
+    bool play(int round) override {
+        string guess;
+        cout << "Guess (H for Higher / L for Lower): ";
+        cin >> guess;
+        int number = (round == 1) ? 15 : (round == 2) ? 7 : (rand() % 20) + 1;
+        cout << "Coin value is: " << number << endl;
+        if (number == 10) return false; // neither
+        if (guess == "H" || guess == "h")
+            return number > 10;
+        else
+            return number < 10;
+    }
+};
+class GuessRangeGame : public NumberGame {
+public:
+    string getName() override { return "Guess the Range (1-25 / 26-50)"; }
+    bool play(int round) override {
+        int guess;
+        cout << "Guess Range (1 for 1-25, 2 for 26-50): ";
+        cin >> guess;
+        int number = (round == 1) ? 7 : (round == 2) ? 40 : (rand() % 50) + 1;
+        cout << "Coin shows: " << number << endl;
+        if (guess == 1 && number >= 1 && number <= 25) return true;
+        if (guess == 2 && number >= 26 && number <= 50) return true;
+        return false;
+    }
+};
+class ExactNumberGame : public NumberGame {
+public:
+    string getName() override { return "Guess the Exact Number (1-5)"; }
+    bool play(int round) override {
+        int guess;
+        cout << "Guess a number between 1 and 5: ";
+        cin >> guess;
+        int number = (round == 1) ? 3 : (round == 2) ? 2 : (rand() % 5) + 1;
+        cout << "Coin shows: " << number << endl;
+        return guess == number;
+    }
+};
+class DiceGame : public NumberGame {
+public:
+    string getName() override { return "Predict the Dice Roll (1-6)"; }
+    bool play(int round) override {
+        int guess;
+        cout << "Predict the dice (1-6): ";
+        cin >> guess;
+        int number = (round == 1) ? 5 : (round == 2) ? 1 : (rand() % 6) + 1;
+        cout << "Dice rolled: " << number << endl;
+        return guess == number;
+    }
+};
+void printGames(vector<unique_ptr<NumberGame>>& games) {
+    printSeparator();
+    for (int i = 0; i < games.size(); ++i) {
+        cout << "| " << (i+1) << ". " << games[i]->getName();
+        int pad = 36 - games[i]->getName().size();
+        for (int j = 0; j < pad; ++j) cout << " ";
+        cout << "|\n";
+    }
+    printSeparator();
+}
+
+int main() {
+    srand((unsigned)time(0));
+    string pname;
+    int initialAmt = 0;
+
+    printHeading("COIN MAGIC");
+
+    cout << "\nEnter your name: ";
+    getline(cin, pname);
+
+    do {
+        cout << "Enter initial amount (minimum 2000): ";
+        cin >> initialAmt;
+        if (initialAmt < 2000) {
+            cout << "Amount should be at least 2000.\n";
+        }
+    } while (initialAmt < 2000);
+
+    Player player(pname, initialAmt);
+
+    vector<unique_ptr<NumberGame>> games;
+    games.push_back(make_unique<OddEvenGame>());
+    games.push_back(make_unique<HigherLowerGame>());
+    games.push_back(make_unique<GuessRangeGame>());
+    games.push_back(make_unique<ExactNumberGame>());
+    games.push_back(make_unique<DiceGame>());
+
+    int round = 1;
+    while (player.getBalance() >= 500) {
+        printHeading("PLAYER DETAILS");
+        cout << "\nPlayer: " << player.getName()
+             << "\nCurrent Balance: " << player.getBalance() << "\n";
+        printGames(games);
+
+        int choice, bet;
+        do {
+            cout << "\nEnter the game number you want to play: ";
+            cin >> choice;
+        } while (choice < 1 || choice > 5);
+
+        do {
+            cout << "Enter bet amount (minimum 500): ";
+            cin >> bet;
+            if (bet < 500 || bet > player.getBalance()) {
+                cout << "Invalid bet! Minimum 500 and not more than your current balance.\n";
+            }
+        } while (bet < 500 || bet > player.getBalance());
+
+        bool win = games[choice-1]->play(round);
+
+        cout << (win ? "Congratulations, you won! +" : "Sorry, you lost. -")
+            << bet << (win ? " added to " : " deducted from ") << "your balance." << endl;
+
+        player.addAmount(win ? bet : -bet);
+
+        cout << "After this round, your balance: " << player.getBalance() << endl;
+        round++;
+
+        if (player.getBalance() < 500) {
+            cout << "You do not have enough balance to continue betting. Exiting.\n";
+            break;
+        }
+
+        cout << "\nWhat would you like to do next?\n";
+        cout << "1. Play another game\n2. Withdraw amount\n";
+        int nextChoice;
+        cin >> nextChoice;
+
+        if (nextChoice == 2) {
+            int withdrawAmt;
+            do {
+                cout << "How much do you want to withdraw? (Maximum " <<
+                    player.getBalance() << "): ";
+                cin >> withdrawAmt;
+                if (withdrawAmt < 0 || withdrawAmt > player.getBalance()) {
+                    cout << "Invalid withdrawal amount!" << endl;
+                }
+            } while (withdrawAmt < 0 || withdrawAmt > player.getBalance());
+
+            player.deductAmount(withdrawAmt);
+            cout << "You withdrew " << withdrawAmt
+                 << ". Remaining balance: " << player.getBalance() << endl;
+            if (player.getBalance() == 0) {
+                cout << "You have withdrawn your complete amount. Exiting.\n";
+                break;
+            }
+        }
+    }
+    printHeading("Thank you for playing COIN MAGIC!");
+    return 0;
+}
